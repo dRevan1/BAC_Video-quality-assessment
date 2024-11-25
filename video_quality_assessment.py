@@ -1,6 +1,9 @@
 import csv
+import numpy as num
+import pandas as pd
+#import matplotlib.pyplot as plotter
 
-
+num.set_printoptions(suppress=True)
 scene_list = []
 resolution_list = [] # HD, FHD, UHD - 720p, 1080p, 2160p
 bitrate_list = [] #[-1] je posledný prvok
@@ -63,7 +66,18 @@ with open("first_session.csv", mode = "r") as file:  #with closene rovno file = 
                 codec_list.append(codec)
                 packet_loss_list.append(get_packet_loss(parameters.split('_')))
 
-                print("{} {} {} {} {} {}".format(scene_list[-1], resolution_list[-1], bitrate_list[-1], codec_list[-1], expected_result, packet_loss_list[-1]))
+                #print("{} {} {} {} {} {}".format(scene_list[-1], resolution_list[-1], bitrate_list[-1], codec_list[-1], expected_result, packet_loss_list[-1]))
         i += 1
 
-    print(i)    
+
+
+#tu začína PCA
+#príprava dát do 2 kommponentov (X, Y)
+x_list = []
+for i in range(len(expected_result_list)):
+    x_list.append([scene_list[i], resolution_list[i], bitrate_list[i], codec_list[i], packet_loss_list[i]])
+
+X = num.array(x_list)
+Y = num.array(expected_result_list)
+
+   
