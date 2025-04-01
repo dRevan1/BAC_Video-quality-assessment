@@ -8,6 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plotter
+from PySide6 import QtWidgets
+from PySide6.QtUiTools import QUiLoader
 
 num.set_printoptions(suppress=True)
 scene_list = []
@@ -67,13 +69,14 @@ def get_resolution(video_name):
     
     return d
 
+
 def train_network_configuration_test(neurons_list, activation_function, x_train, y_train, x_test, y_test, training_results):
     input_layer = Input(shape=(4,))
     layer_list = []
 
     layer_list.append(layers.Dense(neurons_list[0], activation=activation_function)(input_layer))
     for i in range(1, len(neurons_list)):
-        layer_list.append(layers.Dense(neurons_list[i], activation=activation_function)(layer_list[-1]))
+        layer_list.append(layers.Dense(neurons_list[i], activation=activation_function, kernel_regularizer=keras.regularizers.l2(0.04))(layer_list[-1]))
     output_layer = layers.Dense(1, activation='linear')(layer_list[-1])
 
     model = Model(inputs=input_layer, outputs=output_layer)
@@ -84,7 +87,8 @@ def train_network_configuration_test(neurons_list, activation_function, x_train,
     test_loss = model.evaluate(x_test, y_test)
     training_results.append([neurons_list, test_loss])
     
-
+    return model
+    
 
 def get_network_configurations_result(x_train, y_train, x_test, y_test):    
     network_configs = [
@@ -145,7 +149,7 @@ def get_network_configurations_result(x_train, y_train, x_test, y_test):
     results = []
     experiment_results = []
     
-    for i in range(15):
+    for i in range(10):
         for config in network_configs:
             train_network_configuration_test(config, 'relu', x_train, y_train, x_test, y_test, results)
         
@@ -157,9 +161,20 @@ def get_network_configurations_result(x_train, y_train, x_test, y_test):
         print(f"Neurons: {result[0]}")
         print(f"\nFinal test loss: {result[1]}")
         print("-----------------------------------------------------")
+
+
+def try_activation_functions(x_train, y_train, x_test, y_test):
+    results = []
+    activation_functions = ['relu', 'elu', 'selu', 'sigmoid', 'tanh', 'swish', 'softplus']
+    for activation in activation_functions:
+        train_network_configuration_test([256, 128, 64], activation, x_train, y_train, x_test, y_test, results)
     
-    
-    
+    for i in range(len(activation_functions)):
+        print(f"Activation function: {activation_functions[i]}")
+        print(f"Final test loss: {results[i][1]}")
+        print("-----------------------------------------------------") 
+
+ 
 def print_training_result(model, x_train, y_train, x_test, y_test):
     early_stop = callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=1, restore_best_weights=True)    
     history = model.fit(x_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test), callbacks=[early_stop])
@@ -212,8 +227,6 @@ with open("first_session.csv", mode = "r") as file:  #with closene rovno file = 
                 bitrate_list.append(int(parsed_line[2]))
                 codec_list.append(codec)
                 packet_loss_list.append(get_packet_loss(parameters.split('_')))
-                
-                #print("{} {} {} {} {} {} {} {}".format(scene_list[-1], resolution_list[-1], bitrate_list[-1], codec_list[-1], ssim, vmaf, label, packet_loss_list[-1]))
         i += 1
 
 
@@ -281,12 +294,44 @@ pca = PCA(n_components=4)
 X_train = pca.fit_transform(X_train)
 X_test = pca.transform(X_test)
 
-temp = []
-activation_functions = ['relu', 'elu', 'selu', 'sigmoid', 'tanh', 'swish', 'softplus']
-for activation in activation_functions:
-    train_network_configuration_test([256, 128, 64], activation, X_train, Y_train, X_test, Y_test, temp)
-    
-for i in range(len(activation_functions)):
-    print(f"Activation function: {activation_functions[i]}")
-    print(f"Final test loss: {temp[i][1]}")
-    print("-----------------------------------------------------")
+model = train_network_configuration_test([256, 128, 64], 'relu', X_train, Y_train, X_test, Y_test, [])
+
+def submit_for_prediction():
+    scene = window.scene_combo.currentIndex()
+    res_text = window.resolution_combo.currentText().split(" ")[0]
+    resolution = resolution_switch(res_text)
+    codec = window.codec_combo.currentIndex()
+    packet_loss = float(window.loss_input.text())
+    bitrate = float(window.bitrate_input.text())
+    ssim = float(window.ssim_input.text())
+    vmaf = float(window.vmaf_input.text())
+
+    input_data = num.array([[scene, resolution, bitrate, codec, packet_loss, ssim, vmaf]])
+    input_data = Scaler.transform(input_data)
+    input_data = pca.transform(input_data)
+
+    prediction = model.predict(input_data)
+    window.result_label.setText(str(prediction[0][0]))
+
+def refresh_ui():
+    window.result_label.setText("")
+    window.bitrate_input.clear()
+    window.ssim_input.clear()
+    window.vmaf_input.clear()
+    window.loss_input.clear()
+
+loader = QUiLoader()
+app = QtWidgets.QApplication([])
+window = loader.load("VQA_ui.ui")
+window.setWindowTitle("Video Quality Assessment")
+
+window.resolution_combo.addItems(["HD (720p)", "FHD (1080p)", "UHD (2160p)"])
+window.codec_combo.addItems(["H.264", "H.265"])
+window.scene_combo.addItems(["Campfire", "Construction", "Runners", "Rush", "Tall", "Wood"])
+window.submit_button.clicked.connect(submit_for_prediction)
+window.refresh_button.clicked.connect(refresh_ui)
+
+
+
+window.show()
+app.exec()
