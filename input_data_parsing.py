@@ -12,6 +12,7 @@ ssim_list = [] # SSIM je jedna z objektívnych metrík - Structural similarity i
 vmaf_list = [] # VMAF je jedna z objektívnych metrík - Video Multimethod Assessment Fusion
 labels_list = []
 
+# switch funkcie slúžia ako mapy
 def scene_switch(scene_name):
     switch = {
         "Campfire": 1,
@@ -32,6 +33,7 @@ def resolution_switch(res_name):
     }
     return switch.get(res_name, "error_res")
 
+# získava stratovosť z názvu videa a ostatných jeho parametrov vo forme jedného stringu, ako sú v súboroch so vstupnými údajmi formátované
 def get_packet_loss(split_line):
     loss_number = 1.0
 
@@ -45,6 +47,7 @@ def get_packet_loss(split_line):
 
     return loss_number
 
+# ako funkcia vyššie, vracia ale dvojicu rozlíšenia a aj znaku na rozdelenie na ďalšie parsovanie
 def get_resolution(video_name):
     resolutions = ["FullHD", "FHD", "UHD", "HD"]
     d = dict()
@@ -59,6 +62,7 @@ def get_resolution(video_name):
     
     return d
 
+# načítavanie prvého súboru, first_session.csv
 def load_first_file():
     with open("first_session.csv", mode = "r") as file:  #with closene rovno file = nice
         first_session = csv.reader(file, delimiter = ";")
@@ -88,7 +92,8 @@ def load_first_file():
                     codec_list.append(codec)
                     packet_loss_list.append(get_packet_loss(parameters.split('_')))
             i += 1
-    
+
+# načítavanie druhého súboru, second_session.csv    
 def load_second_file():
     #načítanie second session
     with open("second_session.csv", mode = "r") as file:  #with closene rovno file = nice
@@ -131,7 +136,8 @@ def load_second_file():
                     packet_loss_list.append(get_packet_loss(bitrate_PL))
 
             i += 1
-            
+
+# trénovanie modelu podľa parametrov            
 def train_model():
     load_first_file()
     load_second_file()
