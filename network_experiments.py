@@ -2,6 +2,7 @@ from keras import callbacks
 import matplotlib.pyplot as plotter
 import network_training as nt
 
+# funkcia, ktorá skúša rôzne topológie zo zoznamu nižšie, 10-krát prejde všetky a vyberie najlepšiu podľa kvadratickej chyby a vypíše ju
 def get_network_configurations_result(x_train, y_train, x_test, y_test):    
     network_configs = [
         [256, 128, 64, 32, 16],
@@ -74,7 +75,7 @@ def get_network_configurations_result(x_train, y_train, x_test, y_test):
         print(f"\nFinal test loss: {result[1]}")
         print("-----------------------------------------------------")
 
-
+# tu sa skúšajú rôzne aktivačné funkcie, pri testovaní bola pustená viac krát po sebe
 def try_activation_functions(x_train, y_train, x_test, y_test):
     results = []
     activation_functions = ['relu', 'elu', 'selu', 'sigmoid', 'tanh', 'swish', 'softplus']
@@ -91,7 +92,8 @@ def try_activation_functions(x_train, y_train, x_test, y_test):
         results.clear()
      
 
- 
+ # tu sa trénuje neurónová sieť, pričom priebeh sa zaznamená a zobrazí na grafe, toto je funkcia primárne na zobrazenie
+ # kvadratickej chyby do grafu, inak sa použila tá v súbore network_training.py - train_network_configuration_test()
 def print_training_result(model, x_train, y_train, x_test, y_test):
     early_stop = callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=1, restore_best_weights=True)    
     history = model.fit(x_train, y_train, epochs=100, batch_size=32, validation_data=(x_test, y_test), callbacks=[early_stop])

@@ -1,3 +1,6 @@
+# toto je "main" súbor a spúšťa sa z neho aplikácia, ktorá načítava model, pca a scaler vytvorené funkciami v súbore network_training.py
+# a údaje boli načítané funkciami v súbore input_data_parsing.py, teraz už to nie je spojené a aplikácia sa spúšťa tu, v starších verziách
+# na git hub je celý skript v jednom súbore
 import csv
 import json
 import joblib
@@ -13,6 +16,7 @@ from PySide6.QtCore import Qt, QLocale
 from PySide6.QtGui import QIntValidator, QDoubleValidator
 from scipy.stats import pearsonr
 
+# tu sa načítava model, scaler, pca a nastavuje sa okno, do ktorého je načítané grafické rozhranie
 validator_double = QDoubleValidator()
 validator_double.setLocale(QLocale('C'))
 loader = QUiLoader()
@@ -27,6 +31,7 @@ model_vmaf = keras.saving.load_model("vmaf_model.keras")
 window = loader.load("VQA_ui_new.ui")
 window.setWindowTitle("Video Quality Assessment")
 
+# potvrdenie vstupov na predikciu v prvej časti aplikácie
 def submit_for_prediction():
     if check_inputs():
         scene = window.scene_combo.currentIndex() + 1
@@ -40,6 +45,7 @@ def submit_for_prediction():
         prediction = predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler)
         window.result_label.setText(str(prediction))
 
+# obnovenie vstupov v prvej časti apikácie
 def refresh_ui():
     window.result_label.setText("")
     window.bitrate_input.clear()
@@ -47,6 +53,7 @@ def refresh_ui():
     window.vmaf_input.clear()
     window.loss_input.clear()
 
+# ukladanie výsledkov do .csv, pod tým do .xlsx (excle) súboru a poton .json
 def save_to_csv(selected_file, header):
     with open(selected_file, mode="w", newline='') as csv_file:
         csv_writer = csv.writer(csv_file, delimiter=";")
@@ -81,6 +88,7 @@ def save_to_json(selected_file, header):
     with open(selected_file, mode="w") as json_file:
         json.dump(data, json_file, indent=4)
 
+# otvorenie okna na uloženie do súboru
 def save_file_dialog():
     file_dialog = QtWidgets.QFileDialog()
     file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
@@ -98,6 +106,7 @@ def save_file_dialog():
         elif selected_file.split(".")[-1] == "csv":
             save_to_csv(selected_file, header)
 
+# načítanie údajov zo .csv súboru a ich vrátenie, pod tým funkcia na to isté pre .json
 def load_from_csv(selected_file):
     with open(selected_file, mode="r") as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=";")
@@ -114,7 +123,8 @@ def load_from_json(selected_file):
         json_data = [[item["Scene"], item["Codec"], item["Resolution"], item["Bitrate"], item["Packet loss"], item["SSIM"], item["VMAF"], item["MOS"]] for item in json_data]
         data = [header] + json_data
         return data
-         
+    
+# táto funkcia zaobaľuje jednotlivé funkcie načítavania údajov, teda podľa typu zvoleného súboru zavolá príslušnú funkciu
 def get_file_data():
     file_dialog = QtWidgets.QFileDialog()
     file_dialog.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
@@ -133,7 +143,8 @@ def get_file_data():
             data = load_from_csv(selected_file) 
                  
     return data
-        
+
+# získa údaje zo vstupného súboru a vloží ich do tabuľky aj s vypočítaným výsledkom predikcie        
 def open_file_dialog():
     table_data = get_file_data()
     if table_data:
@@ -154,7 +165,9 @@ def open_file_dialog():
                 predicted_value = "ERROR"
             window.predictions_table.setItem(window.predictions_table.rowCount() - 1, 7, QtWidgets.QTableWidgetItem(str(predicted_value)))
         window.predictions_table.setSortingEnabled(True)
-        
+
+# otvorí okno na výber súbora na načítanie s výsledkami, takže okrem vstupov má aj MOS, iba sa naplní tabuľka, teda otvára súbory
+# uložené touto aplikáciou        
 def open_results_file_dialog():
     table_data = get_file_data()
     if table_data:
@@ -177,6 +190,8 @@ def predict_video_quality(scene, codec, resolution, bitrate, packet_loss, object
         
     return prediction
 
+# skontrolovanie vstupov v prvej časti aplikácie, kontroluje sa hodnota, typ je ošetrený na samotných vstupných poliach, 
+# kde je obmedzený ich typ, ak by sa to obišlo tak predikcia zlyhá a jednoducho vráti ako výsledok "ERROR" miesto čísla
 def check_inputs():
     error_message = ""
     if window.bitrate_input.text() == "" or int(window.bitrate_input.text()) < 1 or int(window.bitrate_input.text()) > 15:
@@ -198,6 +213,8 @@ def check_inputs():
     
     return True
 
+# nastavenie prvkov desktop aplikácie, priradenie funkcií tlačidlám a iným prvkom, vložené hodnoty pre combo boxy
+# na konci sa zobrazí okno a spustí aplikácia
 def run_ui():
     window.submit_button.setFocus()
 
@@ -224,6 +241,7 @@ def run_ui():
     window.show()
     app.exec()
 
+# funkcia na zobrazenie grafov MOS oproti hodnote stratovosti (packet_loss), SSIM a VMAF
 def show_model_graphs():
     bitrate = 10
     packet_loss = 0.1

@@ -7,6 +7,7 @@ from keras import Model, layers, metrics, Input
 def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, objective_metric_list, labels_list):
     #tu začína PCA
     #príprava dát do 2 kommponentov (X, Y)
+    # scaler a pca boli odtiaľto uložené do súborov scaler.pkl a pca.pkl
     x_list = []
     for i in range(len(labels_list)):
         x_list.append([scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], objective_metric_list[i]])
@@ -25,7 +26,9 @@ def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packe
     print(pca.explained_variance_ratio_)
     #print(pd.DataFrame(pca.components_, columns=['scene', 'codec', 'resolution', 'bitrate', 'packet_loss', 'objective_metric']))
     return X_train, X_test, Y_train, Y_test
-    
+
+# zostavenie a trénovanie siete, vracia výsledný model, môže ukladať výsledky do zoznamu training_results, ale
+# pri volaní sa môže poslať aj prázdny zoznam, ak ich nepotrebujeme    
 def train_network_configuration_test(neurons_list, activation_function, x_train, y_train, x_test, y_test, training_results):
     input_layer = Input(shape=(5,))
     layer_list = []
