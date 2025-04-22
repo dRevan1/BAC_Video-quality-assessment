@@ -6,6 +6,7 @@ import json
 import joblib
 import pandas as pd
 import numpy as num
+import seaborn as sns
 import keras
 import input_data_parsing as idp
 import matplotlib.pyplot as plotter
@@ -40,8 +41,8 @@ def submit_for_prediction():
         codec = window.codec_combo.currentIndex()
         packet_loss = float(window.loss_input.text().replace(',', '.'))
         bitrate = int(window.bitrate_input.text())
-        objective_metric = float(window.objective_metric_input.currentText())
-        model, scaler, pca = model_ssim, Scaler_ssim, pca_ssim if window.objective_metric_input.currentText() == "SSIM" else (model_vmaf, Scaler_vmaf, pca_vmaf)
+        objective_metric = float(window.objective_metric_input.text())
+        model, scaler, pca = model_ssim, Scaler_ssim, pca_ssim if window.objective_metric_combo.currentText() == "SSIM" else (model_vmaf, Scaler_vmaf, pca_vmaf)
         prediction = predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler)
         window.result_label.setText(str(prediction))
 
@@ -49,8 +50,7 @@ def submit_for_prediction():
 def refresh_ui():
     window.result_label.setText("")
     window.bitrate_input.clear()
-    window.ssim_input.clear()
-    window.vmaf_input.clear()
+    window.objective_metric_input.clear()
     window.loss_input.clear()
 
 # ukladanie výsledkov do .csv, pod tým do .xlsx (excle) súboru a poton .json
@@ -95,7 +95,7 @@ def save_file_dialog():
     file_dialog.setNameFilters(["CSV files (*.csv)", "Excel files (*.xlsx)", "JSON files (*.json)"])
     file_dialog.setDefaultSuffix("csv")
     file_dialog.setViewMode(QtWidgets.QFileDialog.List)
-    header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS"]
+    header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS (SSIM)", "MOS (VMAF)"]
 
     if file_dialog.exec():
         selected_file = file_dialog.selectedFiles()[0]
@@ -118,9 +118,9 @@ def load_from_csv(selected_file):
 
 def load_from_json(selected_file):
     with open(selected_file, mode="r") as json_file:
-        header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS"]
+        header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS (SSIM)", "MOS (VMAF)"]
         json_data = json.load(json_file)
-        json_data = [[item["Scene"], item["Codec"], item["Resolution"], item["Bitrate"], item["Packet loss"], item["SSIM"], item["VMAF"], item["MOS"]] for item in json_data]
+        json_data = [[item["Scene"], item["Codec"], item["Resolution"], item["Bitrate"], item["Packet loss"], item["SSIM"], item["VMAF"], item["MOS (SSIM)"], item["MOS (VMAF)"]] for item in json_data]
         data = [header] + json_data
         return data
     
@@ -148,22 +148,26 @@ def get_file_data():
 def open_file_dialog():
     table_data = get_file_data()
     if table_data:
-        for row in table_data:
+        for i in range(1, len(table_data)):
             window.predictions_table.insertRow(window.predictions_table.rowCount())
-            for column, value in enumerate(row):
+            for column, value in enumerate(table_data[i]):
                 window.predictions_table.setItem(window.predictions_table.rowCount() - 1, column, QtWidgets.QTableWidgetItem(value))
-            if row[1] == "H.264":
+            if table_data[i][1] == "H.264":
                 codec = 0
-            elif row[1] == "H.265":
+            elif table_data[i][1] == "H.265":
                 codec = 1
             else:
                 codec = "error_codec"
             try:
-                objective_metric = row[5] if row[5] != "NONE" else row[6]
-                predicted_value = predict_video_quality(idp.scene_switch(row[0]), codec, idp.resolution_switch(row[2]), int(row[3]), float(row[4]), float(objective_metric))
+                ssim_pred = predict_video_quality(idp.scene_switch(table_data[i][0]), codec, idp.resolution_switch(table_data[i][2]), int(table_data[i][3]), float(table_data[i][4]), float(table_data[i][5]), model_ssim, pca_ssim, Scaler_ssim)
             except:
-                predicted_value = "ERROR"
-            window.predictions_table.setItem(window.predictions_table.rowCount() - 1, 7, QtWidgets.QTableWidgetItem(str(predicted_value)))
+                ssim_pred = "ERROR"
+            try:
+                vmaf_pred = predict_video_quality(idp.scene_switch(table_data[i][0]), codec, idp.resolution_switch(table_data[i][2]), int(table_data[i][3]), float(table_data[i][4]), float(table_data[i][6]), model_vmaf, pca_vmaf, Scaler_vmaf)
+            except:
+                vmaf_pred = "ERROR"
+            window.predictions_table.setItem(window.predictions_table.rowCount() - 1, 7, QtWidgets.QTableWidgetItem(str(ssim_pred)))
+            window.predictions_table.setItem(window.predictions_table.rowCount() - 1, 8, QtWidgets.QTableWidgetItem(str(vmaf_pred)))
         window.predictions_table.setSortingEnabled(True)
 
 # otvorí okno na výber súbora na načítanie s výsledkami, takže okrem vstupov má aj MOS, iba sa naplní tabuľka, teda otvára súbory
@@ -171,13 +175,14 @@ def open_file_dialog():
 def open_results_file_dialog():
     table_data = get_file_data()
     if table_data:
-        if table_data[0][:8] == ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS"]:
+        if table_data[0][:9] == ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS (SSIM)", "MOS (VMAF)"]:
             for i in range(1, len(table_data)):
                 window.predictions_table.insertRow(window.predictions_table.rowCount())
                 for column, value in enumerate(table_data[i]):
                     window.predictions_table.setItem(window.predictions_table.rowCount() - 1, column, QtWidgets.QTableWidgetItem(value))
             window.predictions_table.setSortingEnabled(True)              
 
+# použije model na predikciu, ak sú vstupy zlé a predikcia zlyhá, vráti "ERROR" miesto výsledku
 def predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler):
     try:
         input_data = num.array([[scene, codec, resolution, bitrate, packet_loss, objective_metric]])
@@ -303,6 +308,28 @@ def get_pearsons_correlation():
         
     pearson_ssim, ssim_p_value = pearsonr(mos_true, mos_ssim_pred)
     pearson_vmaf, vmaf_p_value = pearsonr(mos_true, mos_vmaf_pred)
+    
+    plotter.figure(figsize=(6, 6))
+    sns.set(style="whitegrid")
+
+    sns.regplot(x=mos_true, y=mos_ssim_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
+    plotter.xlabel("Referenčná MOS")
+    plotter.ylabel("Predikovaná MOS")
+    plotter.title(f"MOS Korelácia pre SSIM model: {pearson_ssim:.4f}")
+
+    plotter.tight_layout()
+    plotter.show()
+    
+    plotter.figure(figsize=(6, 6))
+    sns.set(style="whitegrid")
+
+    sns.regplot(x=mos_true, y=mos_vmaf_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
+    plotter.xlabel("Referenčná MOS")
+    plotter.ylabel("Predikovaná MOS")
+    plotter.title(f"MOS Korelácia pre VMAF model: {pearson_vmaf:.4f}")
+
+    plotter.tight_layout()
+    plotter.show()
     
     print("-------------------------")
     print(f"SSIM Pearson correlation coefficient: {pearson_ssim:.4f}")

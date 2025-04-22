@@ -23,8 +23,12 @@ def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packe
     pca = PCA(n_components=5)
     X_train = pca.fit_transform(X_train)
     X_test = pca.transform(X_test)
-    print(pca.explained_variance_ratio_)
-    #print(pd.DataFrame(pca.components_, columns=['scene', 'codec', 'resolution', 'bitrate', 'packet_loss', 'objective_metric']))
+    explained_ratios = pca.explained_variance_ratio_
+    print("Principal components: \n")
+    for i, ratio in enumerate(explained_ratios):
+        print(f"{i+1}. - {ratio:.4f}")
+        
+    print(f"\nSum 1-5: {num.sum(explained_ratios[:5]):.4f}")
     return X_train, X_test, Y_train, Y_test
 
 # zostavenie a trénovanie siete, vracia výsledný model, môže ukladať výsledky do zoznamu training_results, ale
@@ -40,7 +44,7 @@ def train_network_configuration_test(neurons_list, activation_function, x_train,
     output_layer = layers.Dense(1, activation='linear')(layer_list[-1])
 
     model = Model(inputs=input_layer, outputs=output_layer)
-    model.compile(optimizer='adam', loss='mse', metrics=[metrics.RootMeanSquaredError()])
+    model.compile(optimizer='adam', loss='mse', metrics=['mse'])
     model.fit(x_train, y_train, epochs=200, batch_size=32, validation_data=(x_test, y_test))
     model.save("vmaf_model.keras")
     

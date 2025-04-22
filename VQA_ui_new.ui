@@ -6,13 +6,13 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>912</width>
+    <width>950</width>
     <height>702</height>
    </rect>
   </property>
   <property name="maximumSize">
    <size>
-    <width>950</width>
+    <width>16777215</width>
     <height>16777215</height>
    </size>
   </property>
@@ -26,7 +26,7 @@
       <bool>true</bool>
      </property>
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="page_main">
       <layout class="QVBoxLayout" name="verticalLayout_3">
@@ -295,7 +295,7 @@
           <number>0</number>
          </property>
          <property name="columnCount">
-          <number>8</number>
+          <number>9</number>
          </property>
          <column>
           <property name="text">
@@ -334,7 +334,12 @@
          </column>
          <column>
           <property name="text">
-           <string>MOS (1 - 5)</string>
+           <string>MOS (SSIM model)</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>MOS (VMAF model)</string>
           </property>
          </column>
         </widget>

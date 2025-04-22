@@ -161,19 +161,11 @@ def load_second_file():
 def train_model():
     load_first_file()
     load_second_file()
-    x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list)
-    model = nt.train_network_configuration_test([256, 128, 64, 32], "relu", x_train, y_train, x_test, y_test, [])
+    x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, vmaf_list, labels_list)
+    model = nt.train_network_configuration_test([256, 128, 64, 32, 16], "swish", x_train, y_train, x_test, y_test, [])
     return model
 
 def get_input_data():
     load_first_file()
     load_second_file()
     return scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list
-
-#load_first_file()
-#load_second_file()
-#x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, vmaf_list, labels_list)
-#nt.train_network_configuration_test([256, 128, 64, 32, 16], "swish", x_train, y_train, x_test, y_test, [])
-
-
-    
