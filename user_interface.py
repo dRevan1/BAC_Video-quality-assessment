@@ -11,14 +11,18 @@ from PySide6 import QtWidgets
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import Qt, QLocale
 from PySide6.QtGui import QIntValidator, QDoubleValidator
+from scipy.stats import pearsonr
 
 validator_double = QDoubleValidator()
 validator_double.setLocale(QLocale('C'))
 loader = QUiLoader()
 app = QtWidgets.QApplication([])
-Scaler = joblib.load("scaler.pkl")
-pca = joblib.load("pca.pkl")
-model = keras.saving.load_model("model110b64d005.keras")
+Scaler_ssim = joblib.load("scaler_ssim.pkl")
+Scaler_vmaf = joblib.load("scaler_vmaf.pkl")
+pca_ssim = joblib.load("pca_ssim.pkl")
+pca_vmaf = joblib.load("pca_vmaf.pkl")
+model_ssim = keras.saving.load_model("ssim_model.keras")
+model_vmaf = keras.saving.load_model("vmaf_model.keras")
    
 window = loader.load("VQA_ui_new.ui")
 window.setWindowTitle("Video Quality Assessment")
@@ -31,9 +35,9 @@ def submit_for_prediction():
         codec = window.codec_combo.currentIndex()
         packet_loss = float(window.loss_input.text().replace(',', '.'))
         bitrate = int(window.bitrate_input.text())
-        ssim = float(window.ssim_input.text().replace(',', '.'))
-        vmaf = float(window.vmaf_input.text().replace(',', '.'))
-        prediction = predict_video_quality(scene, codec, resolution, bitrate, packet_loss, ssim, vmaf)
+        objective_metric = float(window.objective_metric_input.currentText())
+        model, scaler, pca = model_ssim, Scaler_ssim, pca_ssim if window.objective_metric_input.currentText() == "SSIM" else (model_vmaf, Scaler_vmaf, pca_vmaf)
+        prediction = predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler)
         window.result_label.setText(str(prediction))
 
 def refresh_ui():
@@ -144,7 +148,8 @@ def open_file_dialog():
             else:
                 codec = "error_codec"
             try:
-                predicted_value = predict_video_quality(idp.scene_switch(row[0]), codec, idp.resolution_switch(row[2]), int(row[3]), float(row[4]), float(row[5]), float(row[6]))
+                objective_metric = row[5] if row[5] != "NONE" else row[6]
+                predicted_value = predict_video_quality(idp.scene_switch(row[0]), codec, idp.resolution_switch(row[2]), int(row[3]), float(row[4]), float(objective_metric))
             except:
                 predicted_value = "ERROR"
             window.predictions_table.setItem(window.predictions_table.rowCount() - 1, 7, QtWidgets.QTableWidgetItem(str(predicted_value)))
@@ -160,10 +165,10 @@ def open_results_file_dialog():
                     window.predictions_table.setItem(window.predictions_table.rowCount() - 1, column, QtWidgets.QTableWidgetItem(value))
             window.predictions_table.setSortingEnabled(True)              
 
-def predict_video_quality(scene, codec, resolution, bitrate, packet_loss, ssim, vmaf):
+def predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler):
     try:
-        input_data = num.array([[scene, codec, resolution, bitrate, packet_loss, ssim, vmaf]])
-        input_data = Scaler.transform(input_data)
+        input_data = num.array([[scene, codec, resolution, bitrate, packet_loss, objective_metric]])
+        input_data = scaler.transform(input_data)
         input_data = pca.transform(input_data)
         prediction = model.predict(input_data, verbose=0)
         prediction= prediction[0][0]
@@ -180,11 +185,11 @@ def check_inputs():
     if window.loss_input.text() == "" or float(window.loss_input.text()) < 0.0 or float(window.loss_input.text()) > 1.0:
         window.loss_input.clear()
         error_message += "Packet loss must be between 0.0 and 1.0.\n"
-    if window.ssim_input.text() == "" or float(window.ssim_input.text()) < 0.0 or float(window.ssim_input.text()) > 1.0:
-        window.ssim_input.clear()
+    if window.objective_metric_combo.currentText() == "SSIM" and (window.objective_metric_input.text() == "" or float(window.objective_metric_input.text()) < 0.0 or float(window.objective_metric_input.text()) > 1.0):
+        window.objective_metric_input.clear()
         error_message += "SSIM must be between 0.0 and 1.0.\n"
-    if window.vmaf_input.text() == "" or float(window.vmaf_input.text()) < 0.0 or float(window.vmaf_input.text()) > 100.0:
-        window.vmaf_input.clear()
+    if window.objective_metric_combo.currentText() == "VMAF" and (window.objective_metric_input.text() == "" or float(window.objective_metric_input.text()) < 0.0 or float(window.objective_metric_input.text()) > 100.0):
+        window.objective_metric_input.clear()
         error_message += "VMAF must be between 0.0 and 100.0.\n"
         
     if error_message != "":
@@ -199,6 +204,7 @@ def run_ui():
     window.resolution_combo.addItems(["HD (720p)", "FHD (1080p)", "UHD (2160p)"])
     window.codec_combo.addItems(["H.264", "H.265"])
     window.scene_combo.addItems(["Campfire", "Construction", "Runners", "Rush", "Tall", "Wood"])
+    window.objective_metric_combo.addItems(["SSIM", "VMAF"])
     window.predictions_table.setSortingEnabled(True)
     window.predictions_table.model().rowsInserted.connect(lambda: window.save_button.setEnabled(window.predictions_table.rowCount() > 0))
     window.predictions_table.model().rowsRemoved.connect(lambda: window.save_button.setEnabled(window.predictions_table.rowCount() > 0))
@@ -213,8 +219,7 @@ def run_ui():
 
     window.bitrate_input.setValidator(QIntValidator())
     window.loss_input.setValidator(validator_double)
-    window.ssim_input.setValidator(validator_double)
-    window.vmaf_input.setValidator(validator_double)
+    window.objective_metric_input.setValidator(validator_double)
 
     window.show()
     app.exec()
@@ -229,7 +234,7 @@ def show_model_graphs():
     ssim_list = []
     vmaf_list = []
     while packet_loss <= 1.0:
-        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, ssim, vmaf)
+        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, ssim, model_ssim, pca_ssim, Scaler_ssim)
         mos_results.append(result)
         packet_loss_list.append(packet_loss)
         packet_loss += 0.01
@@ -243,12 +248,12 @@ def show_model_graphs():
     packet_loss_list.clear()
     mos_results.clear()
     while ssim <= 1.0:
-        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, ssim, vmaf)
+        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, ssim, model_ssim, pca_ssim, Scaler_ssim)
         mos_results.append(result)
         ssim_list.append(ssim)
         ssim += 0.001
     ssim = 0.971
-    vmaf = 10.0
+    vmaf = 20.0
     plotter.plot(ssim_list, mos_results)
     plotter.title("SSIM vs MOS")
     plotter.xlabel("SSIM")
@@ -257,7 +262,7 @@ def show_model_graphs():
     ssim_list.clear()
     mos_results.clear()
     while vmaf <= 100.0:
-        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, ssim, vmaf)
+        result = predict_video_quality(1, 0, 1080, bitrate, packet_loss, vmaf, model_vmaf, pca_vmaf, Scaler_vmaf)
         mos_results.append(result)
         vmaf_list.append(vmaf)
         vmaf += 0.01
@@ -268,8 +273,31 @@ def show_model_graphs():
     plotter.show()
         
     
+def get_pearsons_correlation():
+    scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list = idp.get_input_data()
+    mos_true, mos_ssim_pred, mos_vmaf_pred = [], [], []
+    for i in range(len(labels_list)):
+        ssim_pred = predict_video_quality(scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], ssim_list[i], model_ssim, pca_ssim, Scaler_ssim)
+        vmaf_pred = predict_video_quality(scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], vmaf_list[i], model_vmaf, pca_vmaf, Scaler_vmaf)
+        mos_true.append(labels_list[i])
+        mos_ssim_pred.append(ssim_pred)
+        mos_vmaf_pred.append(vmaf_pred)
+        
+    pearson_ssim, ssim_p_value = pearsonr(mos_true, mos_ssim_pred)
+    pearson_vmaf, vmaf_p_value = pearsonr(mos_true, mos_vmaf_pred)
+    
+    print("-------------------------")
+    print(f"SSIM Pearson correlation coefficient: {pearson_ssim:.4f}")
+    print(f"SSIM P-value: {ssim_p_value:}")
+    print("-------------------------")
+    print(f"VMAF Pearson correlation coefficient: {pearson_vmaf:.4f}")
+    print(f"VMAF P-value: {vmaf_p_value:}")
+    print("-------------------------")
+        
 
 def main():
+    #get_pearsons_correlation()
+    #show_model_graphs()
     run_ui()
 
 main()

@@ -78,13 +78,18 @@ def get_network_configurations_result(x_train, y_train, x_test, y_test):
 def try_activation_functions(x_train, y_train, x_test, y_test):
     results = []
     activation_functions = ['relu', 'elu', 'selu', 'sigmoid', 'tanh', 'swish', 'softplus']
-    for activation in activation_functions:
-        nt.train_network_configuration_test([256, 128, 64], activation, x_train, y_train, x_test, y_test, results)
-    
-    for i in range(len(activation_functions)):
-        print(f"Activation function: {activation_functions[i]}")
-        print(f"Final test loss: {results[i][1]}")
-        print("-----------------------------------------------------") 
+    for i in range(15): 
+        for activation in activation_functions:
+            nt.train_network_configuration_test([256, 128, 64, 32, 16], activation, x_train, y_train, x_test, y_test, results)
+            
+        print(f"Experiment {i+1}:")
+        for j in range(len(activation_functions)):
+            print(f"Activation function: {activation_functions[j]}")
+            print(f"Final test loss: {results[j][1]}")
+            print("-----------------------------------------------------")
+            
+        results.clear()
+     
 
  
 def print_training_result(model, x_train, y_train, x_test, y_test):

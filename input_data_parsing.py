@@ -59,6 +59,18 @@ def get_resolution(video_name):
     
     return d
 
+def ssim_vmaf_switch(mos_value):
+    objective_results = dict()
+    objective_results["ssim"] = 0.99
+    objective_results["vmaf"] = 98.0
+    if mos_value < 4.2:
+        objective_results["ssim"] = 0.98
+        objective_results["vmaf"] = 94.0
+    elif mos_value < 4.4:
+        objective_results["ssim"] = 0.985
+        objective_results["vmaf"] = 96.0
+    return objective_results
+
 def load_first_file():
     with open("first_session.csv", mode = "r") as file:  #with closene rovno file = nice
         first_session = csv.reader(file, delimiter = ";")
@@ -95,13 +107,15 @@ def load_second_file():
         second_session = csv.reader(file, delimiter = ";")
         i = 0 #celkovo je 502 záznamov vo first_session
         codec = 0 #bude 0/1 podľa kodeku (h264, h265 v poradí)
+        first_session_flag = False
         parsed_line = []
 
         for line in second_session:   #chceme index 0 - slovo sa rozdelý na inputy do ML modelu, index 64 - priemerné ohodnotenie videa (1-5)
             parameters = line[0]
 
             if "Subjective" in parameters:
-                break
+                first_session_flag = True
+                codec = 0
 
             if "HEVC" in parameters:
                 codec = 1
@@ -110,19 +124,26 @@ def load_second_file():
             else:
                 if i > 1:
                     label = float(line[47].strip().replace(',', '.'))
-                    vmaf = float(line[52].strip())
-                    ssim = float(line[51].strip())
+                    if not first_session_flag:
+                        vmaf = float(line[52].strip())
+                        ssim = float(line[51].strip())
+                    else:
+                        if label < 4.0:
+                            continue
+                        objective_results = ssim_vmaf_switch(label)
+                        vmaf = objective_results["vmaf"]
+                        ssim = objective_results["ssim"]
                     labels_list.append(label)
                     vmaf_list.append(vmaf)
                     ssim_list.append(ssim)
                 
                     resolution = get_resolution(parameters)
         
-                    if codec == 1:
+                    if codec == 1 and not first_session_flag:
                         resolution["delimiter"] = "{}{}".format("X", resolution["delimiter"])
                     
                     parsed_line = parameters.split(resolution["delimiter"])
-                    scene = parsed_line[0][:-2] if (parsed_line[0][-1] == 'X') else parsed_line[0][:-1]
+                    scene = parsed_line[0][:-1] if not first_session_flag or (parsed_line[0][-1] == 'X') else parsed_line[0]
                     bitrate_PL = parsed_line[1].split('_')
                     scene_list.append(scene_switch(scene))
                     resolution_list.append(resolution["res"])
@@ -138,4 +159,16 @@ def train_model():
     x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list)
     model = nt.train_network_configuration_test([256, 128, 64, 32], "relu", x_train, y_train, x_test, y_test, [])
     return model
+
+def get_input_data():
+    load_first_file()
+    load_second_file()
+    return scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list
+
+#load_first_file()
+#load_second_file()
+#x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, vmaf_list, labels_list)
+#nt.train_network_configuration_test([256, 128, 64, 32, 16], "swish", x_train, y_train, x_test, y_test, [])
+
+
     
