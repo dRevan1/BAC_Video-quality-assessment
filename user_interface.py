@@ -297,22 +297,23 @@ def show_model_graphs():
         
     
 def get_pearsons_correlation():
-    scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list = idp.get_input_data()
-    mos_true, mos_ssim_pred, mos_vmaf_pred = [], [], []
-    for i in range(len(labels_list)):
-        ssim_pred = predict_video_quality(scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], ssim_list[i], model_ssim, pca_ssim, Scaler_ssim)
-        vmaf_pred = predict_video_quality(scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], vmaf_list[i], model_vmaf, pca_vmaf, Scaler_vmaf)
-        mos_true.append(labels_list[i])
+    ssim_test, labels = idp.get_test_set("ssim")
+    idp.clear_lists()
+    vmaf_test = idp.get_test_set("vmaf")[0]
+    mos_ssim_pred, mos_vmaf_pred = [], []
+    for i in range(len(labels)):
+        ssim_pred = model_ssim.predict(ssim_test[i].reshape(1, -1), verbose=0)[0][0]
+        vmaf_pred = model_vmaf.predict(vmaf_test[i].reshape(1, -1), verbose=0)[0][0]
         mos_ssim_pred.append(ssim_pred)
         mos_vmaf_pred.append(vmaf_pred)
         
-    pearson_ssim, ssim_p_value = pearsonr(mos_true, mos_ssim_pred)
-    pearson_vmaf, vmaf_p_value = pearsonr(mos_true, mos_vmaf_pred)
+    pearson_ssim, ssim_p_value = pearsonr(labels, mos_ssim_pred)
+    pearson_vmaf, vmaf_p_value = pearsonr(labels, mos_vmaf_pred)
     
     plotter.figure(figsize=(6, 6))
     sns.set(style="whitegrid")
 
-    sns.regplot(x=mos_true, y=mos_ssim_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
+    sns.regplot(x=labels, y=mos_ssim_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
     plotter.xlabel("Referenčná MOS")
     plotter.ylabel("Predikovaná MOS")
     plotter.title(f"MOS Korelácia pre SSIM model: {pearson_ssim:.4f}")
@@ -323,7 +324,7 @@ def get_pearsons_correlation():
     plotter.figure(figsize=(6, 6))
     sns.set(style="whitegrid")
 
-    sns.regplot(x=mos_true, y=mos_vmaf_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
+    sns.regplot(x=labels, y=mos_vmaf_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
     plotter.xlabel("Referenčná MOS")
     plotter.ylabel("Predikovaná MOS")
     plotter.title(f"MOS Korelácia pre VMAF model: {pearson_vmaf:.4f}")
@@ -338,7 +339,6 @@ def get_pearsons_correlation():
     print(f"VMAF Pearson correlation coefficient: {pearson_vmaf:.4f}")
     print(f"VMAF P-value: {vmaf_p_value:}")
     print("-------------------------")
-        
 
 def main():
     #get_pearsons_correlation()

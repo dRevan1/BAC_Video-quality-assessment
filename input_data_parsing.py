@@ -169,3 +169,20 @@ def get_input_data():
     load_first_file()
     load_second_file()
     return scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, ssim_list, vmaf_list, labels_list
+
+def get_test_set(objective_metric):
+    objective_list = ssim_list if objective_metric == "ssim" else vmaf_list
+    load_first_file()
+    load_second_file()
+    x_train, x_test, y_train, y_test = nt.preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, objective_list, labels_list)
+    return x_test, y_test
+
+def clear_lists():
+    scene_list.clear()
+    resolution_list.clear()
+    bitrate_list.clear()
+    codec_list.clear()
+    packet_loss_list.clear()
+    ssim_list.clear()
+    vmaf_list.clear()
+    labels_list.clear()

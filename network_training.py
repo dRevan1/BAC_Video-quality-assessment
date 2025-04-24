@@ -1,17 +1,18 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import numpy as num
+import pandas
 from sklearn.model_selection import train_test_split
 from keras import Model, layers, metrics, Input
 
 def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, objective_metric_list, labels_list):
     #tu začína PCA
-    #príprava dát do 2 kommponentov (X, Y)
+    #príprava dát do 5 kommponentov (X, Y)
     # scaler a pca boli odtiaľto uložené do súborov scaler.pkl a pca.pkl
     x_list = []
     for i in range(len(labels_list)):
         x_list.append([scene_list[i], codec_list[i], resolution_list[i], bitrate_list[i], packet_loss_list[i], objective_metric_list[i]])
-
+    feature_names = ['scene', 'codec', 'resolution', 'bitrate', 'packet_loss', 'objective_metric']
     X = num.array(x_list)
     Y = num.array(labels_list)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
@@ -29,6 +30,12 @@ def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packe
         print(f"{i+1}. - {ratio:.4f}")
         
     print(f"\nSum 1-5: {num.sum(explained_ratios[:5]):.4f}")
+    loadings = pandas.DataFrame(pca.components_.T, 
+                        columns=[f'PC{i+1}' for i in range(5)], 
+                        index=feature_names)
+
+    print("\nPCA Components / Loadings Table:")
+    print(loadings.round(4))
     return X_train, X_test, Y_train, Y_test
 
 # zostavenie a trénovanie siete, vracia výsledný model, môže ukladať výsledky do zoznamu training_results, ale
@@ -45,8 +52,8 @@ def train_network_configuration_test(neurons_list, activation_function, x_train,
 
     model = Model(inputs=input_layer, outputs=output_layer)
     model.compile(optimizer='adam', loss='mse', metrics=['mse'])
-    model.fit(x_train, y_train, epochs=200, batch_size=32, validation_data=(x_test, y_test))
-    model.save("vmaf_model.keras")
+    model.fit(x_train, y_train, epochs=300, batch_size=32, validation_data=(x_test, y_test))
+    #model.save("vmaf_model.keras")
     
     test_loss = model.evaluate(x_test, y_test)
     training_results.append([neurons_list, test_loss])
