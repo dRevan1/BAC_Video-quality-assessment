@@ -16,6 +16,7 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import Qt, QLocale
 from PySide6.QtGui import QIntValidator, QDoubleValidator
 from scipy.stats import pearsonr
+from sklearn.metrics import root_mean_squared_error
 
 # tu sa načítava model, scaler, pca a nastavuje sa okno, do ktorého je načítané grafické rozhranie
 validator_double = QDoubleValidator()
@@ -118,14 +119,22 @@ def load_from_csv(selected_file):
 
 def load_from_json(selected_file):
     with open(selected_file, mode="r") as json_file:
+        header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF"]
+        json_data = json.load(json_file)
+        json_data = [[item["Scene"], item["Codec"], item["Resolution"], item["Bitrate"], item["Packet loss"], item["SSIM"], item["VMAF"]] for item in json_data]
+        data = [header] + json_data
+        return data
+    
+def load_results_from_json(selected_file):
+    with open(selected_file, mode="r") as json_file:
         header = ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS (SSIM)", "MOS (VMAF)"]
         json_data = json.load(json_file)
         json_data = [[item["Scene"], item["Codec"], item["Resolution"], item["Bitrate"], item["Packet loss"], item["SSIM"], item["VMAF"], item["MOS (SSIM)"], item["MOS (VMAF)"]] for item in json_data]
         data = [header] + json_data
         return data
-    
+        
 # táto funkcia zaobaľuje jednotlivé funkcie načítavania údajov, teda podľa typu zvoleného súboru zavolá príslušnú funkciu
-def get_file_data():
+def get_file_data(results):
     file_dialog = QtWidgets.QFileDialog()
     file_dialog.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
     file_dialog.setNameFilters(["CSV files (*.csv)", "Excel files (*.xlsx)", "JSON files (*.json)"])
@@ -138,7 +147,7 @@ def get_file_data():
         if selected_file.split(".")[-1] == "xlsx":
             data = pd.read_excel(selected_file, header=None).values.tolist()
         elif selected_file.split(".")[-1] == "json":
-            data = load_from_json(selected_file)
+            data = load_results_from_json(selected_file) if results else load_from_json(selected_file)
         elif selected_file.split(".")[-1] == "csv":
             data = load_from_csv(selected_file) 
                  
@@ -146,8 +155,9 @@ def get_file_data():
 
 # získa údaje zo vstupného súboru a vloží ich do tabuľky aj s vypočítaným výsledkom predikcie        
 def open_file_dialog():
-    table_data = get_file_data()
+    table_data = get_file_data(False)
     if table_data:
+        window.predictions_table.setRowCount(0)
         for i in range(1, len(table_data)):
             window.predictions_table.insertRow(window.predictions_table.rowCount())
             for column, value in enumerate(table_data[i]):
@@ -173,14 +183,14 @@ def open_file_dialog():
 # otvorí okno na výber súbora na načítanie s výsledkami, takže okrem vstupov má aj MOS, iba sa naplní tabuľka, teda otvára súbory
 # uložené touto aplikáciou        
 def open_results_file_dialog():
-    table_data = get_file_data()
+    table_data = get_file_data(True)
     if table_data:
-        if table_data[0][:9] == ["Scene", "Codec", "Resolution", "Bitrate", "Packet loss", "SSIM", "VMAF", "MOS (SSIM)", "MOS (VMAF)"]:
-            for i in range(1, len(table_data)):
-                window.predictions_table.insertRow(window.predictions_table.rowCount())
-                for column, value in enumerate(table_data[i]):
-                    window.predictions_table.setItem(window.predictions_table.rowCount() - 1, column, QtWidgets.QTableWidgetItem(value))
-            window.predictions_table.setSortingEnabled(True)              
+        window.predictions_table.setRowCount(0)
+        for i in range(1, len(table_data)):
+            window.predictions_table.insertRow(window.predictions_table.rowCount())
+            for column, value in enumerate(table_data[i]):
+                window.predictions_table.setItem(window.predictions_table.rowCount() - 1, column, QtWidgets.QTableWidgetItem(value))
+        window.predictions_table.setSortingEnabled(True)              
 
 # použije model na predikciu, ak sú vstupy zlé a predikcia zlyhá, vráti "ERROR" miesto výsledku
 def predict_video_quality(scene, codec, resolution, bitrate, packet_loss, objective_metric, model, pca, scaler):
@@ -309,6 +319,7 @@ def get_pearsons_correlation():
         
     pearson_ssim, ssim_p_value = pearsonr(labels, mos_ssim_pred)
     pearson_vmaf, vmaf_p_value = pearsonr(labels, mos_vmaf_pred)
+    rmse_ssim, rmse_vmaf = root_mean_squared_error(labels, mos_ssim_pred), root_mean_squared_error(labels, mos_vmaf_pred)
     
     plotter.figure(figsize=(6, 6))
     sns.set(style="whitegrid")
@@ -316,7 +327,7 @@ def get_pearsons_correlation():
     sns.regplot(x=labels, y=mos_ssim_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
     plotter.xlabel("Referenčná MOS")
     plotter.ylabel("Predikovaná MOS")
-    plotter.title(f"MOS Korelácia pre SSIM model: {pearson_ssim:.4f}")
+    plotter.title(f"MOS Korelácia pre SSIM model: {pearson_ssim:.4f}, RMSE: {rmse_ssim:.4f}")
 
     plotter.tight_layout()
     plotter.show()
@@ -327,7 +338,7 @@ def get_pearsons_correlation():
     sns.regplot(x=labels, y=mos_vmaf_pred, scatter_kws={"s": 40, "alpha": 0.7}, line_kws={"color": "red"})
     plotter.xlabel("Referenčná MOS")
     plotter.ylabel("Predikovaná MOS")
-    plotter.title(f"MOS Korelácia pre VMAF model: {pearson_vmaf:.4f}")
+    plotter.title(f"MOS Korelácia pre VMAF model: {pearson_vmaf:.4f}, RMSE: {rmse_vmaf:.4f}")
 
     plotter.tight_layout()
     plotter.show()
@@ -335,9 +346,11 @@ def get_pearsons_correlation():
     print("-------------------------")
     print(f"SSIM Pearson correlation coefficient: {pearson_ssim:.4f}")
     print(f"SSIM P-value: {ssim_p_value:}")
+    print(f"SSIM RMSE: {rmse_ssim:.4f}")
     print("-------------------------")
     print(f"VMAF Pearson correlation coefficient: {pearson_vmaf:.4f}")
     print(f"VMAF P-value: {vmaf_p_value:}")
+    print(f"VMAF RMSE: {rmse_vmaf:.4f}")
     print("-------------------------")
 
 def main():

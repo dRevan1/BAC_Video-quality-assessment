@@ -3,7 +3,7 @@ from sklearn.decomposition import PCA
 import numpy as num
 import pandas
 from sklearn.model_selection import train_test_split
-from keras import Model, layers, metrics, Input
+from keras import Model, layers, Input
 
 def preprocess_data(scene_list, codec_list, resolution_list, bitrate_list, packet_loss_list, objective_metric_list, labels_list):
     #tu začína PCA

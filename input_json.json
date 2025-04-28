@@ -1,0 +1,38 @@
+[
+    {
+        "Scene": "Campfire",
+        "Codec": "H.264",
+        "Resolution": "FHD",
+        "Bitrate": "10",
+        "Packet loss": "0.1",
+        "SSIM": "0.971",
+        "VMAF": "97.2"
+    },
+    {
+        "Scene": "Campfire",
+        "Codec": "H.264",
+        "Resolution": "FHD",
+        "Bitrate": "10",
+        "Packet loss": "0.2",
+        "SSIM": "0.975",
+        "VMAF": "92.67"
+    },
+    {
+        "Scene": "Campfire",
+        "Codec": "H.264",
+        "Resolution": "FHD",
+        "Bitrate": "10",
+        "Packet loss": "0.3",
+        "SSIM": "0.961",
+        "VMAF": "65.19"
+    },
+    {
+        "Scene": "Campfire",
+        "Codec": "H.264",
+        "Resolution": "FHD",
+        "Bitrate": "10",
+        "Packet loss": "0.5",
+        "SSIM": "0.945",
+        "VMAF": "31.4"
+    }
+]
